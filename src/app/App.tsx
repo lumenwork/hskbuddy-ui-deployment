@@ -1,92 +1,52 @@
-import { Link, Route, Routes } from "react-router-dom";
+import { useEffect, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { MainNavigation } from "../components/MainNavigation";
+import { api, ApiError } from "../lib/api";
+import type { Course, CourseSummary, Lesson, LessonBlock, User } from "../lib/api";
 import { ui } from "../locales/vi/ui";
 
-function AppShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-dvh bg-paper font-sans text-ink">
-      <a className="skip-link focus-inverse" href="#main-content">
-        {ui.skipToContent}
-      </a>
-      <header className="border-b border-line bg-paper">
-        <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-page">
-          <Link aria-label={ui.brand} className="focus-paper text-lg font-bold tracking-tight text-ink" to="/">
-            {ui.brand}
-          </Link>
-          <MainNavigation placement="desktop" />
-        </div>
-      </header>
-      <main id="main-content" className="mx-auto min-h-[calc(100vh-4rem)] max-w-6xl px-page py-section pb-24 md:py-12 md:pb-12">
-        {children}
-      </main>
-      <footer className="fixed inset-x-0 bottom-0 border-t border-line bg-paper-raised/95 backdrop-blur md:hidden">
-        <MainNavigation placement="mobile" />
-      </footer>
-    </div>
-  );
+function message(error: unknown) {
+  if (!(error instanceof ApiError)) return "Không thể kết nối với máy chủ. Vui lòng thử lại.";
+  const messages: Record<string, string> = { INVALID_CREDENTIALS: "Email hoặc mật khẩu chưa đúng.", INVALID_INPUT: "Vui lòng kiểm tra lại thông tin đã nhập.", EMAIL_ALREADY_REGISTERED: "Email này đã được đăng ký.", TOKEN_INVALID_OR_EXPIRED: "Liên kết không hợp lệ hoặc đã hết hạn.", SESSION_EXPIRED: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", CONTENT_UNAVAILABLE: "Nội dung này hiện chưa khả dụng.", COURSE_OR_LESSON_UNAVAILABLE: "Khóa học hoặc bài học không còn khả dụng.", CSRF_REJECTED: "Phiên làm việc không còn hợp lệ. Vui lòng tải lại trang." };
+  return messages[error.code] ?? "Không thể lưu thay đổi. Vui lòng thử lại.";
 }
 
-function TodayPage() {
-  return (
-    <section aria-labelledby="welcome-title" className="mx-auto max-w-study space-y-6">
-      <div className="space-y-3">
-        <p className="text-meta font-medium text-ink-muted">{ui.today}</p>
-        <h1 id="welcome-title" className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-          {ui.welcomeTitle}
-        </h1>
-        <p className="text-base leading-relaxed text-ink-muted">{ui.welcomeBody}</p>
-      </div>
-      <aside aria-label={ui.languageExampleLabel} className="rounded-paper border border-card-border bg-paper-raised p-4">
-        <p className="text-meta font-medium text-ink-muted">{ui.languageExampleLabel}</p>
-        <p className="mt-3 font-hanzi text-hanzi-inline font-medium text-ink" lang="zh-Hans">
-          {ui.languageExampleHanzi}
-        </p>
-        <p className="mt-1 font-pinyin text-sm leading-relaxed text-ink" lang="zh-Latn-pinyin">
-          {ui.languageExamplePinyin}
-        </p>
-        <p className="mt-1 text-sm leading-relaxed text-ink-muted">{ui.languageExampleMeaning}</p>
-      </aside>
-    </section>
-  );
+function AppShell({ children }: { children: ReactNode }) {
+  return <div className="min-h-dvh bg-paper font-sans text-ink"><a className="skip-link focus-inverse" href="#main-content">{ui.skipToContent}</a><header className="border-b border-line bg-paper"><div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-page"><Link aria-label={ui.brand} className="focus-paper text-lg font-bold tracking-tight text-ink" to="/">{ui.brand}</Link><MainNavigation placement="desktop" /></div></header><main id="main-content" className="mx-auto min-h-[calc(100vh-4rem)] max-w-6xl px-page py-section pb-24 md:py-12 md:pb-12">{children}</main><footer className="fixed inset-x-0 bottom-0 border-t border-line bg-paper-raised/95 backdrop-blur md:hidden"><MainNavigation placement="mobile" /></footer></div>;
 }
 
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <section aria-labelledby="placeholder-title" className="mx-auto max-w-study space-y-3">
-      <p className="text-meta font-medium text-ink-muted">{title}</p>
-      <h1 id="placeholder-title" className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-        {ui.unavailableTitle}
-      </h1>
-      <p className="text-base leading-relaxed text-ink-muted">{ui.unavailableBody}</p>
-    </section>
-  );
+function Loadable({ children }: { children: ReactNode }) { return <section className="mx-auto max-w-study space-y-5">{children}</section>; }
+function Notice({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "error" | "success" }) { const style = tone === "error" ? "border-seal bg-seal-soft text-seal" : tone === "success" ? "border-jade bg-jade-soft text-jade" : "border-card-border bg-paper-raised text-ink-muted"; return <p role={tone === "error" ? "alert" : "status"} className={`rounded-paper border p-4 text-sm leading-relaxed ${style}`}>{children}</p>; }
+function PrimaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) { return <button {...props} className={`focus-paper min-h-control rounded-paper border border-ink bg-ink px-5 py-3 text-sm font-semibold text-paper disabled:cursor-not-allowed disabled:bg-ink-muted ${props.className ?? ""}`} />; }
+function SecondaryLink({ to, children }: { to: string; children: ReactNode }) { return <Link className="focus-paper inline-flex min-h-control items-center rounded-paper border border-ink px-5 py-3 text-sm font-semibold text-ink" to={to}>{children}</Link>; }
+
+function TodayPage() { return <Loadable><p className="text-meta font-medium text-ink-muted">Hôm nay</p><h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Học tiếng Trung, từng bước vững chắc.</h1><p className="text-base leading-relaxed text-ink-muted">Bắt đầu bằng bài học mẫu hoặc đăng ký để chọn lộ trình của bạn.</p><div className="flex flex-wrap gap-3"><SecondaryLink to="/learn">Xem lộ trình học</SecondaryLink><SecondaryLink to="/dang-ky">Tạo tài khoản</SecondaryLink></div></Loadable>; }
+
+function AuthPage({ mode }: { mode: "login" | "register" }) {
+  const navigate = useNavigate(); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
+  const isLogin = mode === "login";
+  async function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(""); try { await api("/auth/" + (isLogin ? "login" : "register"), { method: "POST", body: JSON.stringify({ email, password }) }); navigate(isLogin ? "/learn" : "/bat-dau"); } catch (err) { setError(message(err)); } finally { setSaving(false); } }
+  return <Loadable><div><p className="text-meta font-medium text-ink-muted">Tài khoản</p><h1 className="mt-2 text-3xl font-bold">{isLogin ? "Đăng nhập" : "Tạo tài khoản"}</h1><p className="mt-2 leading-relaxed text-ink-muted">{isLogin ? "Tiếp tục hành trình học của bạn." : "Mật khẩu cần có ít nhất 12 ký tự."}</p></div>{error && <Notice tone="error">{error}</Notice>}<form className="space-y-4" onSubmit={submit}><label className="block text-sm font-semibold">Email<input autoComplete="email" className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label><label className="block text-sm font-semibold">Mật khẩu<input autoComplete={isLogin ? "current-password" : "new-password"} className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" type="password" minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} required /></label><PrimaryButton type="submit" disabled={saving}>{saving ? "Đang xử lý…" : isLogin ? "Đăng nhập" : "Tạo tài khoản"}</PrimaryButton></form><p className="text-sm text-ink-muted">{isLogin ? <>Chưa có tài khoản? <Link className="focus-paper font-semibold text-ink underline underline-offset-4" to="/dang-ky">Tạo tài khoản</Link> · <Link className="focus-paper font-semibold text-ink underline underline-offset-4" to="/quen-mat-khau">Quên mật khẩu</Link></> : <>Đã có tài khoản? <Link className="focus-paper font-semibold text-ink underline underline-offset-4" to="/dang-nhap">Đăng nhập</Link></>}</p></Loadable>;
 }
 
-function NotFound() {
-  return (
-    <section aria-labelledby="not-found-title" className="mx-auto max-w-study space-y-3">
-      <h1 id="not-found-title" className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-        {ui.notFoundTitle}
-      </h1>
-      <Link className="focus-paper font-semibold text-ink underline underline-offset-4" to="/">
-        {ui.backToToday}
-      </Link>
-    </section>
-  );
-}
+function RequestResetPage() { const [email,setEmail]=useState("");const [done,setDone]=useState(false);const [error,setError]=useState("");async function submit(e:FormEvent){e.preventDefault();setError("");try{await api("/auth/request-reset",{method:"POST",body:JSON.stringify({email})});setDone(true)}catch(err){setError(message(err))}}return <Loadable><h1 className="text-3xl font-bold">Đặt lại mật khẩu</h1><p className="leading-relaxed text-ink-muted">Chúng tôi sẽ gửi liên kết nếu email này có tài khoản.</p>{done?<Notice tone="success">Nếu email có tài khoản, một liên kết đặt lại mật khẩu đã được gửi.</Notice>:<form className="space-y-4" onSubmit={submit}><label className="block text-sm font-semibold">Email<input className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></label>{error&&<Notice tone="error">{error}</Notice>}<PrimaryButton type="submit">Gửi liên kết</PrimaryButton></form>}</Loadable> }
+function ResetPasswordPage(){const [params]=useSearchParams();const navigate=useNavigate();const [password,setPassword]=useState("");const [error,setError]=useState("");const [done,setDone]=useState(false);async function submit(e:FormEvent){e.preventDefault();setError("");try{await api("/auth/reset-password",{method:"POST",body:JSON.stringify({token:params.get("token"),password})});setDone(true);setTimeout(()=>navigate("/dang-nhap"),900)}catch(err){setError(message(err))}}return <Loadable><h1 className="text-3xl font-bold">Chọn mật khẩu mới</h1>{done?<Notice tone="success">Mật khẩu đã được đặt lại. Bạn có thể đăng nhập lại.</Notice>:<form className="space-y-4" onSubmit={submit}><label className="block text-sm font-semibold">Mật khẩu mới<input className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" type="password" minLength={12} value={password} onChange={e=>setPassword(e.target.value)} required/></label>{error&&<Notice tone="error">{error}</Notice>}<PrimaryButton type="submit">Lưu mật khẩu mới</PrimaryButton></form>}</Loadable>}
+function VerifyPage(){const [params]=useSearchParams();const [state,setState]=useState<"loading"|"done"|"error">("loading");useEffect(()=>{api("/auth/verify-email",{method:"POST",body:JSON.stringify({token:params.get("token")})}).then(()=>setState("done")).catch(()=>setState("error"))},[params]);return <Loadable><h1 className="text-3xl font-bold">Xác minh email</h1>{state==="loading"?<Notice>Đang xác minh email…</Notice>:state==="done"?<Notice tone="success">Email của bạn đã được xác minh.</Notice>:<Notice tone="error">Liên kết không hợp lệ hoặc đã hết hạn. Hãy đăng nhập để gửi lại email xác minh.</Notice>}</Loadable>}
 
-export function App() {
-  return (
-    <AppShell>
-      <Routes>
-        <Route path="/" element={<TodayPage />} />
-        <Route path="/learn" element={<PlaceholderPage title={ui.learn} />} />
-        <Route path="/review" element={<PlaceholderPage title={ui.review} />} />
-        <Route path="/mock-exams" element={<PlaceholderPage title={ui.mockExam} />} />
-        <Route path="/profile" element={<PlaceholderPage title={ui.profile} />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppShell>
-  );
-}
+function OnboardingPage(){const navigate=useNavigate();const [courses,setCourses]=useState<CourseSummary[]>([]);const [courseID,setCourseID]=useState("");const [timezone,setTimezone]=useState(Intl.DateTimeFormat().resolvedOptions().timeZone||"Asia/Ho_Chi_Minh");const [goal,setGoal]=useState(20);const [error,setError]=useState("");const [loading,setLoading]=useState(true);useEffect(()=>{Promise.all([api<User>("/me"),api<{courses:CourseSummary[]}>("/courses")]).then(([me,catalog])=>{setTimezone(me.timezone);setGoal(me.daily_goal_minutes);setCourses(catalog.courses);setLoading(false)}).catch(err=>{setError(message(err));setLoading(false)})},[]);async function submit(e:FormEvent){e.preventDefault();if(!courseID){setError("Hãy chọn một lộ trình đang khả dụng.");return}setError("");try{await api("/enrollments",{method:"POST",body:JSON.stringify({course_id:courseID})});await api("/me",{method:"PATCH",body:JSON.stringify({timezone,daily_goal_minutes:goal})});navigate(`/courses/${courseID}`)}catch(err){setError(message(err))}}if(loading)return <Loadable><Notice>Đang tải lựa chọn học…</Notice></Loadable>;return <Loadable><h1 className="text-3xl font-bold">Chọn cách bạn muốn bắt đầu</h1><p className="leading-relaxed text-ink-muted">Thiết lập này có thể thay đổi trong phần Tôi.</p>{error&&<Notice tone="error">{error}</Notice>}{courses.length===0?<Notice>Hiện chưa có lộ trình đã xuất bản để chọn. Vui lòng quay lại sau.</Notice>:<form className="space-y-6" onSubmit={submit}><fieldset><legend className="font-semibold">Lộ trình</legend><div className="mt-3 space-y-3">{courses.map(course=><label key={course.id} className={`flex min-h-control cursor-pointer items-start gap-3 rounded-paper border p-4 ${courseID===course.id?"border-ink bg-paper-raised":"border-card-border"}`}><input type="radio" name="course" value={course.id} checked={courseID===course.id} onChange={()=>setCourseID(course.id)}/><span><span className="block font-semibold">{course.title}</span><span className="text-sm text-ink-muted">{course.level_title} · {course.description}</span></span></label>)}</div></fieldset><label className="block font-semibold">Mục tiêu mỗi ngày<select className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" value={goal} onChange={e=>setGoal(Number(e.target.value))}>{[10,15,20,30,45,60].map(value=><option key={value} value={value}>{value} phút</option>)}</select></label><label className="block font-semibold">Múi giờ<input className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" value={timezone} onChange={e=>setTimezone(e.target.value)} required/></label><PrimaryButton type="submit">Lưu và bắt đầu học</PrimaryButton></form>}</Loadable>}
+
+function LearnPage(){const [courses,setCourses]=useState<CourseSummary[]>([]);const [error,setError]=useState("");useEffect(()=>{api<{courses:CourseSummary[]}>("/courses").then(r=>setCourses(r.courses)).catch(err=>setError(message(err)))},[]);return <Loadable><h1 className="text-3xl font-bold">Học</h1>{error&&<Notice tone="error">{error}</Notice>}{courses.length===0&&!error?<Notice>Chưa có khóa học đã xuất bản. Khi nội dung được đội ngũ chuyên môn duyệt, khóa học sẽ xuất hiện ở đây.</Notice>:<div className="space-y-3">{courses.map(c=><Link key={c.id} className="focus-paper block rounded-paper border border-card-border bg-paper-raised p-4" to={`/courses/${c.id}`}><span className="block text-meta text-ink-muted">{c.level_title}</span><span className="mt-1 block font-semibold">{c.title}</span><span className="mt-1 block text-sm leading-relaxed text-ink-muted">{c.description}</span></Link>)}</div>}</Loadable>}
+
+function CoursePage(){const {courseID=""}=useParams();const [course,setCourse]=useState<Course>();const [resume,setResume]=useState<string|null|undefined>();const [error,setError]=useState("");useEffect(()=>{api<Course>(`/courses/${courseID}`).then(setCourse).catch(err=>setError(message(err)));api<{lesson_id:string|null}>(`/me/courses/${courseID}/resume`).then(r=>setResume(r.lesson_id)).catch(()=>setResume(undefined))},[courseID]);if(error)return <Loadable><Notice tone="error">{error}</Notice></Loadable>;if(!course)return <Loadable><Notice>Đang tải lộ trình…</Notice></Loadable>;return <Loadable><p className="text-meta font-medium text-ink-muted">{course.level_code}</p><h1 className="text-3xl font-bold">{course.title}</h1><p className="leading-relaxed text-ink-muted">{course.description}</p>{resume&&<SecondaryLink to={`/lessons/${resume}`}>Tiếp tục bài học</SecondaryLink>}<div className="space-y-6">{course.units.map(unit=><section key={unit.id} aria-labelledby={`unit-${unit.id}`}><h2 id={`unit-${unit.id}`} className="font-semibold">{unit.position}. {unit.title}</h2><ol className="mt-3 space-y-2">{unit.lessons.map(lesson=><li key={lesson.id}><Link className="focus-paper flex min-h-control items-center justify-between gap-3 rounded-paper border border-card-border bg-paper-raised px-4 py-3" to={`/lessons/${lesson.id}`}><span>{lesson.title}</span>{lesson.is_sample&&<span className="text-meta text-ink-muted">Bài mẫu</span>}</Link></li>)}</ol></section>)}</div></Loadable>}
+
+function Audio({ url, label }: { url?: string; label: string }){const [failed,setFailed]=useState(false);if(!url)return <Notice>Âm thanh cho “{label}” hiện chưa khả dụng.</Notice>;return <div className="flex items-center gap-3"><button className="focus-paper inline-flex size-control shrink-0 items-center justify-center rounded-full border border-ink text-ink" type="button" onClick={(e)=>{const audio=(e.currentTarget.nextElementSibling as HTMLAudioElement);audio.play().catch(()=>setFailed(true))}} aria-label={`Nghe ${label}`}>▶</button><audio preload="none" src={url} onError={()=>setFailed(true)}/><span className="text-sm text-ink-muted">Nghe phát âm</span>{failed&&<span className="text-sm text-seal">Không thể phát âm thanh.</span>}</div>}
+function LessonBlockView({ block }: { block: LessonBlock }){if(block.type==="vocabulary")return <section className="space-y-3"><div className="flex flex-col items-center px-page py-section"><div className="hanzi-grid"><span lang="zh-Hans" className="font-hanzi-display text-hanzi-hero font-bold">{block.hanzi}</span></div><p lang="zh-Latn-pinyin" className="mt-4 font-pinyin text-pinyin-hero font-semibold">{block.pinyin}</p><p className="mt-2 text-ink-muted">{block.meaning}</p></div><Audio url={block.audio_url} label={block.hanzi}/></section>;if(block.type==="grammar")return <section className="rounded-paper border border-card-border bg-paper-raised p-4"><h2 className="font-semibold">{block.title}</h2><p className="mt-2 leading-relaxed text-ink-muted">{block.explanation}</p></section>;if(block.type==="example")return <section className="rounded-paper border border-card-border bg-paper-raised p-4"><p lang="zh-Hans" className="font-hanzi text-hanzi-inline font-medium">{block.hanzi}</p><p lang="zh-Latn-pinyin" className="font-pinyin text-sm">{block.pinyin}</p><p className="mt-1 text-sm text-ink-muted">{block.translation}</p><div className="mt-3"><Audio url={block.audio_url} label={block.hanzi}/></div></section>;if(block.type==="audio")return <section><h2 className="font-semibold">{block.label}</h2><div className="mt-3"><Audio url={block.audio_url} label={block.label}/></div></section>;if(block.type==="retrieval")return <section className="rounded-paper border border-card-border p-4"><h2 className="font-semibold">Tự kiểm tra</h2><p className="mt-2 leading-relaxed">{block.prompt}</p><Notice>Phần trả lời sẽ xuất hiện khi bài luyện truy xuất được xuất bản.</Notice></section>;return <Notice tone="error">Không thể hiển thị một khối bài học không được hỗ trợ.</Notice>}
+function LessonPage(){const {lessonID=""}=useParams();const navigate=useNavigate();const [lesson,setLesson]=useState<Lesson>();const [error,setError]=useState("");const [state,setState]=useState("");useEffect(()=>{api<Lesson>(`/lessons/${lessonID}`).then(setLesson).catch(err=>setError(message(err)))},[lessonID]);async function complete(){if(!lesson)return;setState("Đang lưu tiến độ…");try{const response=await api<{created:boolean}>("/lesson-completions",{method:"POST",body:JSON.stringify({lesson_id:lesson.id,lesson_revision_id:lesson.revision_id})});setState(response.created?"Đã lưu hoàn thành bài học.":"Bài học này đã được lưu trước đó.")}catch(err){if(err instanceof ApiError&&err.status===401){navigate("/dang-nhap");return}setState(message(err))}}if(error)return <Loadable><Notice tone="error">{error}</Notice></Loadable>;if(!lesson)return <Loadable><Notice>Đang tải bài học…</Notice></Loadable>;return <Loadable><p className="text-meta text-ink-muted">{lesson.is_sample?"Bài học mẫu":"Bài học"}</p><h1 className="text-3xl font-bold">{lesson.title}</h1>{lesson.blocks.length===0?<Notice tone="error">Bài học này chưa có nội dung có thể hiển thị.</Notice>:lesson.blocks.map((block,index)=><LessonBlockView block={block} key={index}/>) }{!lesson.is_sample&&<PrimaryButton type="button" onClick={complete}>Hoàn thành bài học</PrimaryButton>}{state&&<Notice tone={state.startsWith("Đã")||state.startsWith("Bài")?"success":"error"}>{state}</Notice>}</Loadable>}
+
+function ProfilePage(){const navigate=useNavigate();const [user,setUser]=useState<User>();const [timezone,setTimezone]=useState("");const [goal,setGoal]=useState(20);const [note,setNote]=useState("");useEffect(()=>{api<User>("/me").then(me=>{setUser(me);setTimezone(me.timezone);setGoal(me.daily_goal_minutes)}).catch(()=>navigate("/dang-nhap"))},[navigate]);async function save(e:FormEvent){e.preventDefault();try{const updated=await api<User>("/me",{method:"PATCH",body:JSON.stringify({timezone,daily_goal_minutes:goal})});setUser(updated);setNote("Đã lưu mục tiêu học.")}catch(err){setNote(message(err))}}async function logout(){try{await api("/auth/logout",{method:"POST"});navigate("/")}catch(err){setNote(message(err))}}if(!user)return <Loadable><Notice>Đang kiểm tra phiên đăng nhập…</Notice></Loadable>;return <Loadable><h1 className="text-3xl font-bold">Tôi</h1><p className="leading-relaxed text-ink-muted">{user.email}</p>{!user.email_verified_at&&<button className="focus-paper text-sm font-semibold underline underline-offset-4" onClick={()=>api("/auth/request-verification",{method:"POST"}).then(()=>setNote("Đã gửi email xác minh.")).catch(err=>setNote(message(err)))}>Gửi lại email xác minh</button>}<form className="space-y-4" onSubmit={save}><label className="block font-semibold">Mục tiêu mỗi ngày<select className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" value={goal} onChange={e=>setGoal(Number(e.target.value))}>{[10,15,20,30,45,60].map(n=><option value={n} key={n}>{n} phút</option>)}</select></label><label className="block font-semibold">Múi giờ<input className="focus-paper mt-2 min-h-control w-full rounded-paper border border-card-border bg-paper-raised px-3" value={timezone} onChange={e=>setTimezone(e.target.value)}/></label><PrimaryButton type="submit">Lưu thay đổi</PrimaryButton></form>{note&&<Notice>{note}</Notice>}<button className="focus-paper min-h-control rounded-paper border border-ink px-5 py-3 text-sm font-semibold" onClick={logout}>Đăng xuất</button></Loadable>}
+function PlaceholderPage({title}:{title:string}){return <Loadable><h1 className="text-3xl font-bold">{title}</h1><Notice>Nội dung đang được chuẩn bị.</Notice></Loadable>}
+function NotFound(){return <Loadable><h1 className="text-3xl font-bold">Không tìm thấy trang</h1><SecondaryLink to="/">Về Hôm nay</SecondaryLink></Loadable>}
+
+export function App(){return <AppShell><Routes><Route path="/" element={<TodayPage/>}/><Route path="/dang-nhap" element={<AuthPage mode="login"/>}/><Route path="/dang-ky" element={<AuthPage mode="register"/>}/><Route path="/quen-mat-khau" element={<RequestResetPage/>}/><Route path="/dat-lai-mat-khau" element={<ResetPasswordPage/>}/><Route path="/verify-email" element={<VerifyPage/>}/><Route path="/bat-dau" element={<OnboardingPage/>}/><Route path="/learn" element={<LearnPage/>}/><Route path="/courses/:courseID" element={<CoursePage/>}/><Route path="/lessons/:lessonID" element={<LessonPage/>}/><Route path="/review" element={<PlaceholderPage title="Ôn tập"/>}/><Route path="/mock-exams" element={<PlaceholderPage title="Thi thử"/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="*" element={<NotFound/>}/></Routes></AppShell>}
