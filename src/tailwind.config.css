@@ -1,0 +1,113 @@
+/* Tailwind v4 configuration. Import after tailwindcss in styles.css.
+ * Canonical values live in :root; @theme inline exposes semantic utilities.
+ * Usage and allowed roles: docs/design-system.md.
+ */
+:root {
+  --paper: #F6F4EE;
+  --paper-raised: #FBFAF6;
+  --ink: #23201B;
+  --ink-muted: #6B665C;
+  --ink-faint: #A7A196;
+  --seal: #B23A2E;
+  --seal-soft: #F2DFDA;
+  --seal-on-ink: #E8AFA6;
+  --jade: #2F6E5C;
+  --jade-soft: #DEEBE5;
+  --line: #DCD6C6;
+  --line-soft: #E8E3D6;
+  --card-border: #D8D2C2;
+  --radius: 3px;
+  --font-vn: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-hz-display: "Noto Serif SC", "Songti SC", SimSun, serif;
+  --font-hz: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* Compatibility with existing CSS selectors. */
+  --font-sans: var(--font-vn);
+  --font-hanzi: var(--font-hz);
+  --font-pinyin: var(--font-vn);
+  --space-page: 1.25rem;
+  --space-section: 1.5rem;
+  --size-control: 2.75rem;
+  --size-hanzi-grid: 10.75rem;
+  --width-study: 32.5rem;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-seal: var(--seal);
+  --color-seal-soft: var(--seal-soft);
+  --color-seal-on-ink: var(--seal-on-ink);
+  --color-jade: var(--jade);
+  --color-jade-soft: var(--jade-soft);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-card-border: var(--card-border);
+  --font-sans: var(--font-vn);
+  --font-hanzi: var(--font-hz);
+  --font-hanzi-display: var(--font-hz-display);
+  --font-pinyin: var(--font-vn);
+  --radius-paper: var(--radius);
+  --spacing-page: var(--space-page);
+  --spacing-section: var(--space-section);
+  --spacing-control: var(--size-control);
+  --spacing-hanzi-grid: var(--size-hanzi-grid);
+  --container-study: var(--width-study);
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.5;
+  --text-hanzi-inline: 1.1875rem;
+  --text-hanzi-inline--line-height: 1.6;
+  --text-pinyin-hero: 1.375rem;
+  --text-pinyin-hero--line-height: 1.5;
+  --text-hanzi-hero: 6.5rem;
+  --text-hanzi-hero--line-height: 1;
+}
+
+@layer components {
+  /* One functional grid, behind the lesson hero only. Never in an exam. */
+  .hanzi-grid {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    place-items: center;
+    width: var(--size-hanzi-grid);
+    max-width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--card-border);
+    background: var(--paper-raised);
+  }
+
+  .hanzi-grid::before,
+  .hanzi-grid::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    background: var(--card-border);
+    z-index: -1;
+  }
+
+  .hanzi-grid::before {
+    inset-block: 0;
+    left: 50%;
+    width: 1px;
+  }
+
+  .hanzi-grid::after {
+    inset-inline: 0;
+    top: 50%;
+    height: 1px;
+  }
+
+  .focus-paper:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  /* Apply to controls whose outline falls on an ink surface. */
+  .focus-inverse:focus-visible {
+    outline: 2px solid var(--paper);
+    outline-offset: 3px;
+  }
+}
